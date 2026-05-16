@@ -7,7 +7,7 @@ const kegaretaSauces = [{
     "typeSource": "single",
     "itemType": 1,
     "isNsfw": true,
-    "version": "0.0.1.6",
+    "version": "0.0.1.7",
     "dateFormat": "",
     "dateFormatLocale": "",
     "pkgPath": "anime/src/all/hentaitv.js"
@@ -44,10 +44,19 @@ class DefaultExtension extends MProvider {
 
             if (!title) continue;
 
-            const img =
-                item.selectFirst("img")?.attr("src") ||
+            let img =
                 item.selectFirst("img")?.attr("data-src") ||
+                item.selectFirst("img")?.attr("src") ||
+                item.selectFirst("img")?.attr("data-lazy-src") ||
                 "";
+
+            if (img.startsWith("//")) {
+                img = "https:" + img;
+            }
+
+            if (img.startsWith("/")) {
+                img = this.source.baseUrl + img;
+            }
 
             list.push({
                 name: title,
@@ -95,9 +104,19 @@ class DefaultExtension extends MProvider {
                 .includes(query.toLowerCase())
             ) continue;
 
-            const img =
+            let img =
+                item.selectFirst("img")?.attr("data-src") ||
                 item.selectFirst("img")?.attr("src") ||
+                item.selectFirst("img")?.attr("data-lazy-src") ||
                 "";
+
+            if (img.startsWith("//")) {
+                img = "https:" + img;
+            }
+
+            if (img.startsWith("/")) {
+                img = this.source.baseUrl + img;
+            }
 
             list.push({
                 name: title,
@@ -128,10 +147,19 @@ class DefaultExtension extends MProvider {
             doc.selectFirst("title")?.text ??
             "Unknown";
 
-        const image =
+        let image =
             doc.selectFirst("meta[property='og:image']")
                 ?.attr("content") ??
-            doc.selectFirst("img")?.attr("src");
+            doc.selectFirst("img")?.attr("src") ??
+            "";
+
+        if (image.startsWith("//")) {
+            image = "https:" + image;
+        }
+
+        if (image.startsWith("/")) {
+            image = this.source.baseUrl + image;
+        }
 
         const description =
             doc.selectFirst("meta[name='description']")
