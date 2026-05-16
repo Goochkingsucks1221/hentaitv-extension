@@ -122,8 +122,6 @@ async getVideoList(url) {
 
     const client = new Client();
 
-    console.log("PAGE URL:", url);
-
     const res = await client.get(url, {
         headers: {
             "User-Agent": "Mozilla/5.0"
@@ -132,17 +130,11 @@ async getVideoList(url) {
 
     const body = res.body;
 
-    console.log("MAIN PAGE HTML:");
-    console.log(body);
-
-    // iframe detection
+    // find iframe first
     const iframeMatch =
         body.match(/<iframe[^>]+src=["']([^"']+)["']/i);
 
-    console.log("IFRAME MATCH:", iframeMatch);
-
     if (!iframeMatch) {
-        console.log("NO IFRAME FOUND");
         return [];
     }
 
@@ -156,8 +148,7 @@ async getVideoList(url) {
         iframeUrl = this.source.baseUrl + iframeUrl;
     }
 
-    console.log("IFRAME URL:", iframeUrl);
-
+    // load player page
     const iframeRes = await client.get(iframeUrl, {
         headers: {
             "Referer": url,
@@ -166,37 +157,32 @@ async getVideoList(url) {
         }
     });
 
-    const iframeBody = iframeRes.body;
+    const html = iframeRes.body;
 
-    console.log("IFRAME HTML:");
-    console.log(iframeBody);
+    // look for downloadable mp4
+    const mp4Match = html.match(
+        /https?:\/\/[^"' ]+\.mp4\?[^"' ]+/i
+    );
 
-    // search for video urls
-    const regex =
-        /https?:\/\/[^"' ]+\.(m3u8|mp4)[^"' ]*/g;
-
-    const matches =
-        [...iframeBody.matchAll(regex)];
-
-    console.log("VIDEO MATCHES:", matches);
-
-    if (matches.length === 0) {
-        console.log("NO VIDEO URL FOUND");
+    if (!mp4Match) {
+        console.log("NO DOWNLOAD LINK FOUND");
         return [];
     }
 
-    return matches.map(v => ({
-        url: v[0],
-        originalUrl: v[0],
-        quality: v[0].includes(".m3u8")
-            ? "HLS"
-            : "MP4",
+    const videoUrl = mp4Match[0];
+
+    console.log("VIDEO URL:", videoUrl);
+
+    return [{
+        url: videoUrl,
+        originalUrl: videoUrl,
+        quality: "HD",
         headers: {
             "Referer": iframeUrl,
             "Origin": this.source.baseUrl,
             "User-Agent": "Mozilla/5.0"
         }
-    }));
+    }];
 }
 
     async getPageList() {
