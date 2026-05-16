@@ -7,7 +7,7 @@ const kegaretaSauces = [{
     "typeSource": "single",
     "itemType": 1,
     "isNsfw": true,
-    "version": "0.0.1.1",
+    "version": "0.0.1.2",
     "dateFormat": "",
     "dateFormatLocale": "",
     "pkgPath": "anime/src/all/hentaitv.js"
@@ -44,6 +44,11 @@ class DefaultExtension extends MProvider {
             list,
             hasNextPage: true
         };
+    }
+
+    async getLatestUpdates(page) {
+
+        return await this.getPopular(page);
     }
 
     async search(query, page, filters) {
@@ -130,3 +135,5 @@ class DefaultExtension extends MProvider {
         return [];
     }
 }
+
+extension = new DefaultExtension();
