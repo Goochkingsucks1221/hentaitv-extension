@@ -1,13 +1,13 @@
 const kegaretaSauces = [{
     "name": "HentaiTV",
-    "lang": "all",
+    "lang": "en",
     "baseUrl": "https://hentai.tv",
     "apiUrl": "",
     "iconUrl": "https://hentai.tv/favicon.ico",
     "typeSource": "single",
     "itemType": 1,
     "isNsfw": true,
-    "version": "0.0.1.3",
+    "version": "0.0.1.6",
     "dateFormat": "",
     "dateFormatLocale": "",
     "pkgPath": "anime/src/all/hentaitv.js"
@@ -18,33 +18,47 @@ class DefaultExtension extends MProvider {
     async getPopular(page) {
 
         const res = await new Client().get(
-            `${this.source.baseUrl}/page/${page}`
+            this.source.baseUrl
         );
 
         const doc = new Document(res.body);
 
         const list = [];
 
-        const items = doc.select(".crsl-slde");
+        const items = doc.select("a");
 
         for (const item of items) {
 
-            const a = item.selectFirst("a");
+            const href = item.attr("href");
 
-            if (!a) continue;
+            if (!href) continue;
 
-            const img = item.selectFirst("img");
+            if (
+                !href.includes("/hentai/") &&
+                !href.includes("/videos/")
+            ) continue;
+
+            const title =
+                item.attr("title") ||
+                item.text.trim();
+
+            if (!title) continue;
+
+            const img =
+                item.selectFirst("img")?.attr("src") ||
+                item.selectFirst("img")?.attr("data-src") ||
+                "";
 
             list.push({
-                name: a.text.trim(),
-                imageUrl: img?.attr("src"),
-                link: a.attr("href")
+                name: title,
+                imageUrl: img,
+                link: href
             });
         }
 
         return {
             list,
-            hasNextPage: true
+            hasNextPage: false
         };
     }
 
@@ -62,20 +76,33 @@ class DefaultExtension extends MProvider {
 
         const list = [];
 
-        const items = doc.select(".crsl-slde, article");
+        const items = doc.select("a");
 
         for (const item of items) {
 
-            const a = item.selectFirst("a");
+            const href = item.attr("href");
 
-            if (!a) continue;
+            if (!href) continue;
 
-            const img = item.selectFirst("img");
+            const title =
+                item.attr("title") ||
+                item.text.trim();
+
+            if (!title) continue;
+
+            if (
+                !title.toLowerCase()
+                .includes(query.toLowerCase())
+            ) continue;
+
+            const img =
+                item.selectFirst("img")?.attr("src") ||
+                "";
 
             list.push({
-                name: a.text.trim(),
-                imageUrl: img?.attr("src"),
-                link: a.attr("href")
+                name: title,
+                imageUrl: img,
+                link: href
             });
         }
 
@@ -120,49 +147,62 @@ class DefaultExtension extends MProvider {
 
     async getVideoList(url) {
 
-    const res = await new Client().get(url);
+        const res = await new Client().get(url);
 
-    const doc = new Document(res.body);
+        const doc = new Document(res.body);
 
-    const videos = [];
+        const videos = [];
 
-    const server = doc.selectFirst(".servers ul li");
+        const server = doc.selectFirst(".servers ul li");
 
-    if (!server) {
+        if (!server) {
+            return [];
+        }
+
+        const dataId = server.attr("data-id");
+
+        if (!dataId) {
+            return [];
+        }
+
+        const match = dataId.match(/vid=([^&]+)/);
+
+        if (!match) {
+            return [];
+        }
+
+        const encoded = match[1];
+
+        let decoded = "";
+
+        try {
+
+            decoded = atob(encoded);
+
+        } catch (e) {
+
+            return [];
+        }
+
+        videos.push({
+            url: decoded,
+            quality: "MP4"
+        });
+
+        return videos;
+    }
+
+    async getPageList() {
+        throw new Error("Not manga source");
+    }
+
+    getFilterList() {
         return [];
     }
 
-    const dataId = server.attr("data-id");
-
-    if (!dataId) {
+    getSourcePreferences() {
         return [];
     }
-
-    const match = dataId.match(/vid=([^&]+)/);
-
-    if (!match) {
-        return [];
-    }
-
-    const encoded = match[1];
-
-    let decoded = "";
-
-    try {
-
-        decoded = atob(encoded);
-
-    } catch (e) {
-
-        return [];
-    }
-
-    videos.push({
-        url: decoded,
-        quality: "MP4"
-    });
-
-    return videos;
 }
 
 extension = new DefaultExtension();
