@@ -120,30 +120,40 @@ class DefaultExtension extends MProvider {
 
     async getVideoList(url) {
 
-        const res = await new Client().get(url);
+    const res = await new Client().get(url);
 
-        const doc = new Document(res.body);
+    const body = res.body;
 
-        const videos = [];
+    const videos = [];
 
-        const iframe = doc.selectFirst("iframe");
+    const match = body.match(/vid:"([^"]+)"/);
 
-        if (iframe) {
-
-            let iframeUrl = iframe.attr("src");
-
-            if (iframeUrl.startsWith("//")) {
-                iframeUrl = "https:" + iframeUrl;
-            }
-
-            videos.push({
-                url: iframeUrl,
-                quality: "Default"
-            });
-        }
-
-        return videos;
+    if (!match) {
+        return [];
     }
+
+    const encoded = match[1];
+
+    let decoded = "";
+
+    try {
+
+        decoded = atob(encoded);
+
+    } catch (e) {
+
+        return [];
+    }
+
+    const realUrl = decoded.split("|")[0];
+
+    videos.push({
+        url: realUrl,
+        quality: "MP4"
+    });
+
+    return videos;
+}
 
     async getPageList() {
         throw new Error("Not manga source");
