@@ -122,6 +122,7 @@ async getVideoList(url) {
 
     const client = new Client();
 
+    // load episode page
     const res = await client.get(url, {
         headers: {
             "User-Agent": "Mozilla/5.0"
@@ -130,11 +131,12 @@ async getVideoList(url) {
 
     const body = res.body;
 
-    // find iframe first
+    // find iframe
     const iframeMatch =
         body.match(/<iframe[^>]+src=["']([^"']+)["']/i);
 
     if (!iframeMatch) {
+        console.log("iframe not found");
         return [];
     }
 
@@ -148,7 +150,9 @@ async getVideoList(url) {
         iframeUrl = this.source.baseUrl + iframeUrl;
     }
 
-    // load player page
+    console.log("iframe:", iframeUrl);
+
+    // load jwplayer page
     const iframeRes = await client.get(iframeUrl, {
         headers: {
             "Referer": url,
@@ -159,30 +163,44 @@ async getVideoList(url) {
 
     const html = iframeRes.body;
 
-    // look for downloadable mp4
-    const mp4Match = html.match(
-        /https?:\/\/[^"' ]+\.mp4\?[^"' ]+/i
-    );
+    console.log(html);
 
-    if (!mp4Match) {
-        console.log("NO DOWNLOAD LINK FOUND");
-        return [];
+    // extract jwplayer file/source
+    const matches = [
+        ...html.matchAll(
+            /file\s*:\s*["']([^"']+)["']/g
+        )
+    ];
+
+    console.log(matches);
+
+    const videos = [];
+
+    for (const match of matches) {
+
+        const videoUrl = match[1];
+
+        if (
+            videoUrl.includes(".m3u8") ||
+            videoUrl.includes(".mp4")
+        ) {
+
+            videos.push({
+                url: videoUrl,
+                originalUrl: videoUrl,
+                quality: videoUrl.includes(".m3u8")
+                    ? "HLS"
+                    : "MP4",
+                headers: {
+                    "Referer": iframeUrl,
+                    "Origin": this.source.baseUrl,
+                    "User-Agent": "Mozilla/5.0"
+                }
+            });
+        }
     }
 
-    const videoUrl = mp4Match[0];
-
-    console.log("VIDEO URL:", videoUrl);
-
-    return [{
-        url: videoUrl,
-        originalUrl: videoUrl,
-        quality: "HD",
-        headers: {
-            "Referer": iframeUrl,
-            "Origin": this.source.baseUrl,
-            "User-Agent": "Mozilla/5.0"
-        }
-    }];
+    return videos;
 }
 
     async getPageList() {
