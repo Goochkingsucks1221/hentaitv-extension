@@ -122,26 +122,30 @@ async getVideoList(url) {
 
     const client = new Client();
 
-    // load episode page
+    // STEP 1: Load episode page
     const res = await client.get(url, {
         headers: {
-            "User-Agent": "Mozilla/5.0"
+            "User-Agent":
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
         }
     });
 
     const body = res.body;
 
-    // find iframe
+    // STEP 2: Find iframe/player URL
     const iframeMatch =
         body.match(/<iframe[^>]+src=["']([^"']+)["']/i);
 
     if (!iframeMatch) {
-        console.log("iframe not found");
+
+        console.log("IFRAME NOT FOUND");
+
         return [];
     }
 
     let iframeUrl = iframeMatch[1];
 
+    // Fix relative URLs
     if (iframeUrl.startsWith("//")) {
         iframeUrl = "https:" + iframeUrl;
     }
@@ -150,55 +154,138 @@ async getVideoList(url) {
         iframeUrl = this.source.baseUrl + iframeUrl;
     }
 
-    console.log("iframe:", iframeUrl);
+    console.log("IFRAME URL:", iframeUrl);
 
-    // load jwplayer page
+    // STEP 3: Load iframe/player page
     const iframeRes = await client.get(iframeUrl, {
         headers: {
             "Referer": url,
             "Origin": this.source.baseUrl,
-            "User-Agent": "Mozilla/5.0"
+            "User-Agent":
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+            "Accept": "*/*"
         }
     });
 
     const html = iframeRes.body;
 
+    console.log("PLAYER HTML:");
     console.log(html);
 
-    // extract jwplayer file/source
-    const matches = [
-        ...html.matchAll(
-            /file\s*:\s*["']([^"']+)["']/g
-        )
-    ];
+    // STEP 4: Extract cookies
+    let cookies = "";
 
-    console.log(matches);
+    try {
 
+        const setCookie =
+            iframeRes.headers["set-cookie"];
+
+        if (setCookie) {
+
+            if (Array.isArray(setCookie)) {
+
+                cookies = setCookie
+                    .map(v => v.split(";")[0])
+                    .join("; ");
+
+            } else {
+
+                cookies =
+                    setCookie
+                        .split(";")[0];
+            }
+        }
+
+    } catch (e) {
+
+        console.log("COOKIE ERROR:", e);
+    }
+
+    console.log("COOKIES:", cookies);
+
+    // STEP 5: Find MP4/M3U8 URLs
+    const matches = [];
+
+    // direct URLs
+    const directRegex =
+        /https?:\/\/[^"' ]+\.(mp4|m3u8)[^"' ]*/gi;
+
+    matches.push(
+        ...[...html.matchAll(directRegex)]
+            .map(v => v[0])
+    );
+
+    // JWPlayer file:
+    const fileRegex =
+        /file\s*:\s*["']([^"']+)["']/gi;
+
+    matches.push(
+        ...[...html.matchAll(fileRegex)]
+            .map(v => v[1])
+    );
+
+    console.log("MATCHES:", matches);
+
+    // STEP 6: Build video list
     const videos = [];
 
-    for (const match of matches) {
+    const used = new Set();
 
-        const videoUrl = match[1];
+    for (const videoUrl of matches) {
 
         if (
-            videoUrl.includes(".m3u8") ||
-            videoUrl.includes(".mp4")
+            !videoUrl.includes(".mp4") &&
+            !videoUrl.includes(".m3u8")
         ) {
+            continue;
+        }
 
-            videos.push({
-                url: videoUrl,
-                originalUrl: videoUrl,
-                quality: videoUrl.includes(".m3u8")
+        if (used.has(videoUrl)) {
+            continue;
+        }
+
+        used.add(videoUrl);
+
+        videos.push({
+
+            url: videoUrl,
+
+            originalUrl: videoUrl,
+
+            quality:
+                videoUrl.includes(".m3u8")
                     ? "HLS"
                     : "MP4",
-                headers: {
-                    "Referer": iframeUrl,
-                    "Origin": this.source.baseUrl,
-                    "User-Agent": "Mozilla/5.0"
-                }
-            });
-        }
+
+            headers: {
+
+                "Referer": iframeUrl,
+
+                "Origin": this.source.baseUrl,
+
+                "User-Agent":
+                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+
+                "Accept": "*/*",
+
+                "Accept-Language":
+                    "en-US,en;q=0.9",
+
+                "Sec-Fetch-Dest":
+                    "video",
+
+                "Sec-Fetch-Mode":
+                    "cors",
+
+                "Sec-Fetch-Site":
+                    "cross-site",
+
+                "Cookie": cookies
+            }
+        });
     }
+
+    console.log("VIDEOS:", videos);
 
     return videos;
 }
