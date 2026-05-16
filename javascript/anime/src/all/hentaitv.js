@@ -120,52 +120,90 @@ class DefaultExtension extends MProvider {
 
 async getVideoList(url) {
 
-    const res = await new Client().get(url);
+    const client = new Client();
+
+    const res = await client.get(url, {
+        headers: {
+            "User-Agent": "Mozilla/5.0"
+        }
+    });
 
     const body = res.body;
 
-    const playerMatch = body.match(/player\.php\?vid=([^"'&]+)/);
+    // extract iframe
+    let iframeUrl = null;
 
-    if (!playerMatch) {
-        return [];
-    }
+    const iframeMatch =
+        body.match(/<iframe[^>]+src=["']([^"']+)["']/i);
 
-    const vid = playerMatch[1];
+    if (iframeMatch) {
 
-    const playerUrl =
-        `${this.source.baseUrl}/player.php?vid=${vid}`;
+        iframeUrl = iframeMatch[1];
 
-    const playerRes = await new Client().get(
-        playerUrl,
-        {
-            headers: {
-                "Referer": url,
-                "User-Agent": "Mozilla/5.0"
-            }
+        if (iframeUrl.startsWith("//")) {
+            iframeUrl = "https:" + iframeUrl;
         }
-    );
 
-    const playerBody = playerRes.body;
+        if (iframeUrl.startsWith("/")) {
+            iframeUrl = this.source.baseUrl + iframeUrl;
+        }
+    }
 
-    const mp4Match = playerBody.match(
-        /https?:\/\/[^"' ]+\.mp4[^"' ]*/
-    );
-
-    if (!mp4Match) {
+    if (!iframeUrl) {
         return [];
     }
 
-    const videoUrl = mp4Match[0];
-
-    return [{
-        url: videoUrl,
-        originalUrl: videoUrl,
-        quality: "MP4",
+    // load iframe/player page
+    const iframeRes = await client.get(iframeUrl, {
         headers: {
-            "Referer": "https://hentai.tv/",
+            "Referer": url,
+            "Origin": this.source.baseUrl,
             "User-Agent": "Mozilla/5.0"
         }
-    }];
+    });
+
+    const html = iframeRes.body;
+
+    const videos = [];
+
+    // find ALL m3u8/mp4 links
+    const regex =
+        /https?:\/\/[^"'\\ ]+\.(m3u8|mp4)[^"'\\ ]*/g;
+
+    const matches = [...html.matchAll(regex)];
+
+    for (const match of matches) {
+
+        const videoUrl = match[0];
+
+        videos.push({
+            url: videoUrl,
+            originalUrl: videoUrl,
+            quality: videoUrl.includes(".m3u8")
+                ? "HLS"
+                : "MP4",
+            headers: {
+                "Referer": iframeUrl,
+                "Origin": this.source.baseUrl,
+                "User-Agent": "Mozilla/5.0"
+            }
+        });
+    }
+
+    // remove duplicates
+    const unique = [];
+    const used = new Set();
+
+    for (const v of videos) {
+
+        if (used.has(v.url)) continue;
+
+        used.add(v.url);
+
+        unique.push(v);
+    }
+
+    return unique;
 }
 
     async getPageList() {
