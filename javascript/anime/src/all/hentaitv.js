@@ -118,7 +118,7 @@ class DefaultExtension extends MProvider {
         };
     }
 
-    async getVideoList(url) {
+async getVideoList(url) {
 
     const res = await new Client().get(url);
 
@@ -149,7 +149,12 @@ class DefaultExtension extends MProvider {
 
     videos.push({
         url: realUrl,
-        quality: "MP4"
+        originalUrl: realUrl,
+        quality: "1080p",
+        headers: {
+            "Referer": "https://hentai.tv/",
+            "User-Agent": "Mozilla/5.0"
+        }
     });
 
     return videos;
