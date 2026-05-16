@@ -124,40 +124,48 @@ async getVideoList(url) {
 
     const body = res.body;
 
-    const videos = [];
+    const playerMatch = body.match(/player\.php\?vid=([^"'&]+)/);
 
-    const match = body.match(/vid:"([^"]+)"/);
-
-    if (!match) {
+    if (!playerMatch) {
         return [];
     }
 
-    const encoded = match[1];
+    const vid = playerMatch[1];
 
-    let decoded = "";
+    const playerUrl =
+        `${this.source.baseUrl}/player.php?vid=${vid}`;
 
-    try {
+    const playerRes = await new Client().get(
+        playerUrl,
+        {
+            headers: {
+                "Referer": url,
+                "User-Agent": "Mozilla/5.0"
+            }
+        }
+    );
 
-        decoded = atob(encoded);
+    const playerBody = playerRes.body;
 
-    } catch (e) {
+    const mp4Match = playerBody.match(
+        /https?:\/\/[^"' ]+\.mp4[^"' ]*/
+    );
 
+    if (!mp4Match) {
         return [];
     }
 
-    const realUrl = decoded.split("|")[0];
+    const videoUrl = mp4Match[0];
 
-    videos.push({
-        url: realUrl,
-        originalUrl: realUrl,
-        quality: "1080p",
+    return [{
+        url: videoUrl,
+        originalUrl: videoUrl,
+        quality: "MP4",
         headers: {
             "Referer": "https://hentai.tv/",
             "User-Agent": "Mozilla/5.0"
         }
-    });
-
-    return videos;
+    }];
 }
 
     async getPageList() {
