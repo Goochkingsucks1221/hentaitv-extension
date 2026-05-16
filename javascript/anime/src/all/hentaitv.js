@@ -122,6 +122,8 @@ async getVideoList(url) {
 
     const client = new Client();
 
+    console.log("PAGE URL:", url);
+
     const res = await client.get(url, {
         headers: {
             "User-Agent": "Mozilla/5.0"
@@ -130,30 +132,32 @@ async getVideoList(url) {
 
     const body = res.body;
 
-    // extract iframe
-    let iframeUrl = null;
+    console.log("MAIN PAGE HTML:");
+    console.log(body);
 
+    // iframe detection
     const iframeMatch =
         body.match(/<iframe[^>]+src=["']([^"']+)["']/i);
 
-    if (iframeMatch) {
+    console.log("IFRAME MATCH:", iframeMatch);
 
-        iframeUrl = iframeMatch[1];
-
-        if (iframeUrl.startsWith("//")) {
-            iframeUrl = "https:" + iframeUrl;
-        }
-
-        if (iframeUrl.startsWith("/")) {
-            iframeUrl = this.source.baseUrl + iframeUrl;
-        }
-    }
-
-    if (!iframeUrl) {
+    if (!iframeMatch) {
+        console.log("NO IFRAME FOUND");
         return [];
     }
 
-    // load iframe/player page
+    let iframeUrl = iframeMatch[1];
+
+    if (iframeUrl.startsWith("//")) {
+        iframeUrl = "https:" + iframeUrl;
+    }
+
+    if (iframeUrl.startsWith("/")) {
+        iframeUrl = this.source.baseUrl + iframeUrl;
+    }
+
+    console.log("IFRAME URL:", iframeUrl);
+
     const iframeRes = await client.get(iframeUrl, {
         headers: {
             "Referer": url,
@@ -162,48 +166,37 @@ async getVideoList(url) {
         }
     });
 
-    const html = iframeRes.body;
+    const iframeBody = iframeRes.body;
 
-    const videos = [];
+    console.log("IFRAME HTML:");
+    console.log(iframeBody);
 
-    // find ALL m3u8/mp4 links
+    // search for video urls
     const regex =
-        /https?:\/\/[^"'\\ ]+\.(m3u8|mp4)[^"'\\ ]*/g;
+        /https?:\/\/[^"' ]+\.(m3u8|mp4)[^"' ]*/g;
 
-    const matches = [...html.matchAll(regex)];
+    const matches =
+        [...iframeBody.matchAll(regex)];
 
-    for (const match of matches) {
+    console.log("VIDEO MATCHES:", matches);
 
-        const videoUrl = match[0];
-
-        videos.push({
-            url: videoUrl,
-            originalUrl: videoUrl,
-            quality: videoUrl.includes(".m3u8")
-                ? "HLS"
-                : "MP4",
-            headers: {
-                "Referer": iframeUrl,
-                "Origin": this.source.baseUrl,
-                "User-Agent": "Mozilla/5.0"
-            }
-        });
+    if (matches.length === 0) {
+        console.log("NO VIDEO URL FOUND");
+        return [];
     }
 
-    // remove duplicates
-    const unique = [];
-    const used = new Set();
-
-    for (const v of videos) {
-
-        if (used.has(v.url)) continue;
-
-        used.add(v.url);
-
-        unique.push(v);
-    }
-
-    return unique;
+    return matches.map(v => ({
+        url: v[0],
+        originalUrl: v[0],
+        quality: v[0].includes(".m3u8")
+            ? "HLS"
+            : "MP4",
+        headers: {
+            "Referer": iframeUrl,
+            "Origin": this.source.baseUrl,
+            "User-Agent": "Mozilla/5.0"
+        }
+    }));
 }
 
     async getPageList() {
