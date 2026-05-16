@@ -1,13 +1,13 @@
 const kegaretaSauces = [{
     "name": "HentaiTV",
-    "lang": "en",
+    "lang": "all",
     "baseUrl": "https://hentai.tv",
     "apiUrl": "",
     "iconUrl": "https://hentai.tv/favicon.ico",
     "typeSource": "single",
     "itemType": 1,
     "isNsfw": true,
-    "version": "0.0.1.7",
+    "version": "0.0.1.3",
     "dateFormat": "",
     "dateFormatLocale": "",
     "pkgPath": "anime/src/all/hentaitv.js"
@@ -18,56 +18,33 @@ class DefaultExtension extends MProvider {
     async getPopular(page) {
 
         const res = await new Client().get(
-            this.source.baseUrl
+            `${this.source.baseUrl}/page/${page}`
         );
 
         const doc = new Document(res.body);
 
         const list = [];
 
-        const items = doc.select("a");
+        const items = doc.select(".crsl-slde");
 
         for (const item of items) {
 
-            const href = item.attr("href");
+            const a = item.selectFirst("a");
 
-            if (!href) continue;
+            if (!a) continue;
 
-            if (
-                !href.includes("/hentai/") &&
-                !href.includes("/videos/")
-            ) continue;
-
-            const title =
-                item.attr("title") ||
-                item.text.trim();
-
-            if (!title) continue;
-
-            let img =
-                item.selectFirst("img")?.attr("data-src") ||
-                item.selectFirst("img")?.attr("src") ||
-                item.selectFirst("img")?.attr("data-lazy-src") ||
-                "";
-
-            if (img.startsWith("//")) {
-                img = "https:" + img;
-            }
-
-            if (img.startsWith("/")) {
-                img = this.source.baseUrl + img;
-            }
+            const img = item.selectFirst("img");
 
             list.push({
-                name: title,
-                imageUrl: img,
-                link: href
+                name: a.text.trim(),
+                imageUrl: img?.attr("src"),
+                link: a.attr("href")
             });
         }
 
         return {
             list,
-            hasNextPage: false
+            hasNextPage: true
         };
     }
 
@@ -85,43 +62,20 @@ class DefaultExtension extends MProvider {
 
         const list = [];
 
-        const items = doc.select("a");
+        const items = doc.select(".crsl-slde, article");
 
         for (const item of items) {
 
-            const href = item.attr("href");
+            const a = item.selectFirst("a");
 
-            if (!href) continue;
+            if (!a) continue;
 
-            const title =
-                item.attr("title") ||
-                item.text.trim();
-
-            if (!title) continue;
-
-            if (
-                !title.toLowerCase()
-                .includes(query.toLowerCase())
-            ) continue;
-
-            let img =
-                item.selectFirst("img")?.attr("data-src") ||
-                item.selectFirst("img")?.attr("src") ||
-                item.selectFirst("img")?.attr("data-lazy-src") ||
-                "";
-
-            if (img.startsWith("//")) {
-                img = "https:" + img;
-            }
-
-            if (img.startsWith("/")) {
-                img = this.source.baseUrl + img;
-            }
+            const img = item.selectFirst("img");
 
             list.push({
-                name: title,
-                imageUrl: img,
-                link: href
+                name: a.text.trim(),
+                imageUrl: img?.attr("src"),
+                link: a.attr("href")
             });
         }
 
@@ -147,19 +101,10 @@ class DefaultExtension extends MProvider {
             doc.selectFirst("title")?.text ??
             "Unknown";
 
-        let image =
+        const image =
             doc.selectFirst("meta[property='og:image']")
                 ?.attr("content") ??
-            doc.selectFirst("img")?.attr("src") ??
-            "";
-
-        if (image.startsWith("//")) {
-            image = "https:" + image;
-        }
-
-        if (image.startsWith("/")) {
-            image = this.source.baseUrl + image;
-        }
+            doc.selectFirst("img")?.attr("src");
 
         const description =
             doc.selectFirst("meta[name='description']")
@@ -181,41 +126,21 @@ class DefaultExtension extends MProvider {
 
         const videos = [];
 
-        const server = doc.selectFirst(".servers ul li");
+        const iframe = doc.selectFirst("iframe");
 
-        if (!server) {
-            return [];
+        if (iframe) {
+
+            let iframeUrl = iframe.attr("src");
+
+            if (iframeUrl.startsWith("//")) {
+                iframeUrl = "https:" + iframeUrl;
+            }
+
+            videos.push({
+                url: iframeUrl,
+                quality: "Default"
+            });
         }
-
-        const dataId = server.attr("data-id");
-
-        if (!dataId) {
-            return [];
-        }
-
-        const match = dataId.match(/vid=([^&]+)/);
-
-        if (!match) {
-            return [];
-        }
-
-        const encoded = match[1];
-
-        let decoded = "";
-
-        try {
-
-            decoded = atob(encoded);
-
-        } catch (e) {
-
-            return [];
-        }
-
-        videos.push({
-            url: decoded,
-            quality: "MP4"
-        });
 
         return videos;
     }
