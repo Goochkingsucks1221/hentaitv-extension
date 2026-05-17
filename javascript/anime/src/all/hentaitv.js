@@ -126,73 +126,40 @@ async getVideoList(url) {
     const res = await client.get(url, {
         headers: {
             "User-Agent":
-                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
         }
     });
 
-    const body = res.body;
+    const html = res.body;
 
-    // STEP 2: Find iframe URL
-    const iframeMatch =
-        body.match(/<iframe[^>]+src=["']([^"']+)["']/i);
-
-    if (!iframeMatch) {
-
-        console.log("IFRAME NOT FOUND");
-
-        return [];
-    }
-
-    let iframeUrl = iframeMatch[1];
-
-    // Fix relative URLs
-    if (iframeUrl.startsWith("//")) {
-        iframeUrl = "https:" + iframeUrl;
-    }
-
-    if (iframeUrl.startsWith("/")) {
-        iframeUrl = this.source.baseUrl + iframeUrl;
-    }
-
-    console.log("IFRAME URL:", iframeUrl);
-
-    // STEP 3: Load iframe/player page
-    const iframeRes = await client.get(iframeUrl, {
-        headers: {
-            "Referer": url,
-            "Origin": this.source.baseUrl,
-            "User-Agent":
-                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
-            "Accept": "*/*"
-        }
-    });
-
-    const html = iframeRes.body;
-
-    console.log("PLAYER HTML:");
+    console.log("EPISODE HTML:");
     console.log(html);
 
-    // STEP 4: Find encoded player URL
-    const playerMatch =
+    // STEP 2: Extract data-id directly
+    const dataMatch =
         html.match(/data-id=["']([^"']+)["']/i);
 
-    if (!playerMatch) {
+    if (!dataMatch) {
 
-        console.log("PLAYER DATA-ID NOT FOUND");
+        console.log("DATA-ID NOT FOUND");
 
         return [];
     }
 
-    let playerUrl = playerMatch[1];
+    let playerPath = dataMatch[1];
 
-    // Fix relative URL
+    console.log("PLAYER PATH:", playerPath);
+
+    // STEP 3: Fix URL
+    let playerUrl = playerPath;
+
     if (playerUrl.startsWith("/")) {
         playerUrl = this.source.baseUrl + playerUrl;
     }
 
     console.log("PLAYER URL:", playerUrl);
 
-    // STEP 5: Extract encoded video URL
+    // STEP 4: Extract vid parameter
     const vidMatch =
         playerUrl.match(/[?&]vid=([^&]+)/);
 
@@ -213,14 +180,24 @@ async getVideoList(url) {
 
     } catch (e) {
 
-        console.log("BASE64 DECODE ERROR:", e);
+        console.log("BASE64 ERROR:", e);
 
         return [];
     }
 
-    console.log("DECODED VIDEO URL:", decodedUrl);
+    console.log("DECODED URL:", decodedUrl);
 
-    // STEP 6: Build video list
+    if (
+        !decodedUrl.includes(".mp4") &&
+        !decodedUrl.includes(".m3u8")
+    ) {
+
+        console.log("NOT A VIDEO URL");
+
+        return [];
+    }
+
+    // STEP 5: Return video
     return [{
         url: decodedUrl,
 
@@ -233,19 +210,14 @@ async getVideoList(url) {
 
         headers: {
 
-            // IMPORTANT:
-            // Most of these CDNs require this exact referer
             "Referer": "https://nhplayer.com/",
 
             "Origin": new URL(decodedUrl).origin,
 
             "User-Agent":
-                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
 
-            "Accept": "*/*",
-
-            "Accept-Language":
-                "en-US,en;q=0.9"
+            "Accept": "*/*"
         }
     }];
 }
