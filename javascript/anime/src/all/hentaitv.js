@@ -132,7 +132,7 @@ async getVideoList(url) {
 
     const body = res.body;
 
-    // STEP 2: Find iframe/player URL
+    // STEP 2: Find iframe URL
     const iframeMatch =
         body.match(/<iframe[^>]+src=["']([^"']+)["']/i);
 
@@ -172,124 +172,83 @@ async getVideoList(url) {
     console.log("PLAYER HTML:");
     console.log(html);
 
-    // STEP 4: Extract cookies
-    let cookies = "";
+    // STEP 4: Find encoded player URL
+    const playerMatch =
+        html.match(/data-id=["']([^"']+)["']/i);
+
+    if (!playerMatch) {
+
+        console.log("PLAYER DATA-ID NOT FOUND");
+
+        return [];
+    }
+
+    let playerUrl = playerMatch[1];
+
+    // Fix relative URL
+    if (playerUrl.startsWith("/")) {
+        playerUrl = this.source.baseUrl + playerUrl;
+    }
+
+    console.log("PLAYER URL:", playerUrl);
+
+    // STEP 5: Extract encoded video URL
+    const vidMatch =
+        playerUrl.match(/[?&]vid=([^&]+)/);
+
+    if (!vidMatch) {
+
+        console.log("VID PARAM NOT FOUND");
+
+        return [];
+    }
+
+    let decodedUrl = "";
 
     try {
 
-        const setCookie =
-            iframeRes.headers["set-cookie"];
-
-        if (setCookie) {
-
-            if (Array.isArray(setCookie)) {
-
-                cookies = setCookie
-                    .map(v => v.split(";")[0])
-                    .join("; ");
-
-            } else {
-
-                cookies =
-                    setCookie
-                        .split(";")[0];
-            }
-        }
+        decodedUrl = atob(
+            decodeURIComponent(vidMatch[1])
+        );
 
     } catch (e) {
 
-        console.log("COOKIE ERROR:", e);
+        console.log("BASE64 DECODE ERROR:", e);
+
+        return [];
     }
 
-    console.log("COOKIES:", cookies);
-
-    // STEP 5: Find MP4/M3U8 URLs
-    const matches = [];
-
-    // direct URLs
-    const directRegex =
-        /https?:\/\/[^"' ]+\.(mp4|m3u8)[^"' ]*/gi;
-
-    matches.push(
-        ...[...html.matchAll(directRegex)]
-            .map(v => v[0])
-    );
-
-    // JWPlayer file:
-    const fileRegex =
-        /file\s*:\s*["']([^"']+)["']/gi;
-
-    matches.push(
-        ...[...html.matchAll(fileRegex)]
-            .map(v => v[1])
-    );
-
-    console.log("MATCHES:", matches);
+    console.log("DECODED VIDEO URL:", decodedUrl);
 
     // STEP 6: Build video list
-    const videos = [];
+    return [{
+        url: decodedUrl,
 
-    const used = new Set();
+        originalUrl: decodedUrl,
 
-    for (const videoUrl of matches) {
+        quality:
+            decodedUrl.includes(".m3u8")
+                ? "HLS"
+                : "MP4",
 
-        if (
-            !videoUrl.includes(".mp4") &&
-            !videoUrl.includes(".m3u8")
-        ) {
-            continue;
+        headers: {
+
+            // IMPORTANT:
+            // Most of these CDNs require this exact referer
+            "Referer": "https://nhplayer.com/",
+
+            "Origin": new URL(decodedUrl).origin,
+
+            "User-Agent":
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+
+            "Accept": "*/*",
+
+            "Accept-Language":
+                "en-US,en;q=0.9"
         }
-
-        if (used.has(videoUrl)) {
-            continue;
-        }
-
-        used.add(videoUrl);
-
-        videos.push({
-
-            url: videoUrl,
-
-            originalUrl: videoUrl,
-
-            quality:
-                videoUrl.includes(".m3u8")
-                    ? "HLS"
-                    : "MP4",
-
-            headers: {
-
-                "Referer": iframeUrl,
-
-                "Origin": this.source.baseUrl,
-
-                "User-Agent":
-                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
-
-                "Accept": "*/*",
-
-                "Accept-Language":
-                    "en-US,en;q=0.9",
-
-                "Sec-Fetch-Dest":
-                    "video",
-
-                "Sec-Fetch-Mode":
-                    "cors",
-
-                "Sec-Fetch-Site":
-                    "cross-site",
-
-                "Cookie": cookies
-            }
-        });
-    }
-
-    console.log("VIDEOS:", videos);
-
-    return videos;
+    }];
 }
-
     async getPageList() {
         throw new Error("Not manga source");
     }
