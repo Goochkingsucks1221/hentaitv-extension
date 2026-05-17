@@ -51,9 +51,24 @@ class DefaultExtension extends MProvider {
             item.selectFirst("h3")?.text?.trim() ||
             a.text.trim();
 
-        const image =
+        let image =
             img?.attr("data-src") ||
-            img?.attr("src");
+            img?.attr("src") ||
+            "";
+
+        // Convert backdrop preview -> poster
+        if (image.includes("timthumb")) {
+
+            image = image
+                .replace(
+                    /timthumb\/backdrop\.php\?src=/,
+                    ""
+                )
+                .replace(
+                    /backdrop\d*\.(jpg|png|webp)/i,
+                    "poster.jpg"
+                );
+        }
 
         console.log("TITLE:", title);
         console.log("LINK:", link);
@@ -80,91 +95,125 @@ class DefaultExtension extends MProvider {
 
     async search(query, page, filters) {
 
-        const doc = await this.request(
-            `${this.source.baseUrl}/?s=${encodeURIComponent(query)}`
-        );
+    const doc = await this.request(
+        `${this.source.baseUrl}/?s=${encodeURIComponent(query)}`
+    );
 
-        const list = [];
+    const list = [];
 
-        const items = doc.select("article");
+    const items = doc.select("article, .item, .bs");
 
-        for (const item of items) {
+    for (const item of items) {
 
-            const a = item.selectFirst("a");
+        const a =
+            item.selectFirst("a[href]");
 
-            if (!a) continue;
+        if (!a) continue;
 
-            const img = item.selectFirst("img");
+        const link = a.attr("href");
 
-            list.push({
-                name:
-                    img?.attr("alt") ||
-                    a.attr("title") ||
-                    a.text.trim(),
+        const img =
+            item.selectFirst("img");
 
-                imageUrl:
-                    img?.attr("data-src") ||
-                    img?.attr("src"),
+        const title =
+            img?.attr("alt") ||
+            a.attr("title") ||
+            item.selectFirst("h3")?.text?.trim() ||
+            a.text.trim();
 
-                link: a.attr("href")
-            });
+        let image =
+            img?.attr("data-src") ||
+            img?.attr("src") ||
+            "";
+
+        // Convert backdrop preview -> poster
+        if (image.includes("timthumb")) {
+
+            image = image
+                .replace(
+                    /timthumb\/backdrop\.php\?src=/,
+                    ""
+                )
+                .replace(
+                    /backdrop\d*\.(jpg|png|webp)/i,
+                    "poster.jpg"
+                );
         }
 
-        return {
-            list,
-            hasNextPage: false
-        };
+        list.push({
+            name: title || "Unknown",
+            imageUrl: image,
+            link
+        });
     }
+
+    return {
+        list,
+        hasNextPage: false
+    };
+}
 
     async getDetail(url) {
 
-        const doc = await this.request(url);
+    const doc = await this.request(url);
 
-        const title =
-            doc.selectFirst("h1")?.text ||
-            doc.selectFirst("title")?.text ||
-            "Unknown";
+    const title =
+        doc.selectFirst("h1")?.text ||
+        doc.selectFirst("title")?.text ||
+        "Unknown";
 
-        const image =
-            doc.selectFirst("meta[property='og:image']")
-                ?.attr("content") ||
-            doc.selectFirst("img")
-                ?.attr("src");
+    let image =
+        doc.selectFirst("meta[property='og:image']")
+            ?.attr("content") ||
+        doc.selectFirst("img")
+            ?.attr("src") ||
+        "";
 
-        const description =
-            doc.selectFirst("meta[name='description']")
-                ?.attr("content") ||
-            "";
+    // Convert backdrop -> poster
+    if (image.includes("backdrop")) {
 
-        const episodes = [];
+        image = image.replace(
+            /backdrop\d*\.(jpg|png|webp)/i,
+            "poster.jpg"
+        );
+    }
 
-        const epLinks = doc.select("a[href*='episode']");
+    const description =
+        doc.selectFirst("meta[name='description']")
+            ?.attr("content") ||
+        "";
 
-        if (epLinks.length > 0) {
+    const episodes = [];
 
-            for (const ep of epLinks) {
+    const epLinks = doc.select(
+        "a[href*='episode']"
+    );
 
-                episodes.push({
-                    name: ep.text.trim(),
-                    url: ep.attr("href")
-                });
-            }
+    if (epLinks.length > 0) {
 
-        } else {
+        for (const ep of epLinks) {
 
             episodes.push({
-                name: "Episode 1",
-                url
+                name: ep.text.trim(),
+                url: ep.attr("href")
             });
         }
 
-        return {
-            name: title,
-            imageUrl: image,
-            description,
-            episodes
-        };
+    } else {
+
+        episodes.push({
+            name: "Episode 1",
+            url
+        });
     }
+
+    return {
+        name: title,
+        imageUrl: image,
+        description,
+        episodes
+    };
+}
 
     async getVideoList(url) {
 
