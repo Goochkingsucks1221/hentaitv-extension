@@ -1,16 +1,16 @@
-const kegaretaSauces = [{
-    "name": "HentaiTV",
-    "lang": "all",
-    "baseUrl": "https://hentai.tv",
+const watchhentaiExtension = [{
+    "name": "WatchHentai",
+    "lang": "en-Sub",
+    "baseUrl": "https://watchhentai.net",
     "apiUrl": "",
-    "iconUrl": "https://hentai.tv/favicon.ico",
+    "iconUrl": "https://watchhentai.net/favicon.ico",
     "typeSource": "single",
     "itemType": 1,
     "isNsfw": true,
-    "version": "0.0.1.3",
+    "version": "0.0.1.0",
     "dateFormat": "",
     "dateFormatLocale": "",
-    "pkgPath": "anime/src/all/hentaitv.js"
+    "pkgPath": "anime/src/all/watchhentai.js"
 }];
 
 class DefaultExtension extends MProvider {
@@ -18,14 +18,14 @@ class DefaultExtension extends MProvider {
     async getPopular(page) {
 
         const res = await new Client().get(
-            `${this.source.baseUrl}/page/${page}`
+            `${this.source.baseUrl}/tvshows/page/${page}/`
         );
 
         const doc = new Document(res.body);
 
         const list = [];
 
-        const items = doc.select(".crsl-slde");
+        const items = doc.select(".items .item");
 
         for (const item of items) {
 
@@ -35,9 +35,17 @@ class DefaultExtension extends MProvider {
 
             const img = item.selectFirst("img");
 
+            const title =
+                item.selectFirst(".data h3")?.text?.trim() ||
+                img?.attr("alt") ||
+                a.attr("title") ||
+                "Unknown";
+
             list.push({
-                name: a.text.trim(),
-                imageUrl: img?.attr("src"),
+                name: title,
+                imageUrl:
+                    img?.attr("data-src") ||
+                    img?.attr("src"),
                 link: a.attr("href")
             });
         }
@@ -49,7 +57,44 @@ class DefaultExtension extends MProvider {
     }
 
     async getLatestUpdates(page) {
-        return await this.getPopular(page);
+
+        const res = await new Client().get(
+            `${this.source.baseUrl}/episodes/page/${page}/`
+        );
+
+        const doc = new Document(res.body);
+
+        const list = [];
+
+        const items = doc.select(".items .item");
+
+        for (const item of items) {
+
+            const a = item.selectFirst("a");
+
+            if (!a) continue;
+
+            const img = item.selectFirst("img");
+
+            const title =
+                item.selectFirst(".data h3")?.text?.trim() ||
+                img?.attr("alt") ||
+                a.attr("title") ||
+                "Unknown";
+
+            list.push({
+                name: title,
+                imageUrl:
+                    img?.attr("data-src") ||
+                    img?.attr("src"),
+                link: a.attr("href")
+            });
+        }
+
+        return {
+            list,
+            hasNextPage: true
+        };
     }
 
     async search(query, page, filters) {
@@ -62,7 +107,7 @@ class DefaultExtension extends MProvider {
 
         const list = [];
 
-        const items = doc.select(".crsl-slde, article");
+        const items = doc.select(".items .item, article");
 
         for (const item of items) {
 
@@ -72,9 +117,18 @@ class DefaultExtension extends MProvider {
 
             const img = item.selectFirst("img");
 
+            const title =
+                item.selectFirst(".data h3")?.text?.trim() ||
+                img?.attr("alt") ||
+                a.attr("title") ||
+                a.text.trim() ||
+                "Unknown";
+
             list.push({
-                name: a.text.trim(),
-                imageUrl: img?.attr("src"),
+                name: title,
+                imageUrl:
+                    img?.attr("data-src") ||
+                    img?.attr("src"),
                 link: a.attr("href")
             });
         }
@@ -91,24 +145,55 @@ class DefaultExtension extends MProvider {
 
         const doc = new Document(res.body);
 
-        const episodes = [{
-            name: "Episode 1",
-            url: url
-        }];
-
         const title =
-            doc.selectFirst("h1")?.text ??
-            doc.selectFirst("title")?.text ??
+            doc.selectFirst("h1")?.text?.trim() ||
+            doc.selectFirst("title")?.text?.trim() ||
             "Unknown";
 
         const image =
             doc.selectFirst("meta[property='og:image']")
-                ?.attr("content") ??
-            doc.selectFirst("img")?.attr("src");
+                ?.attr("content") ||
+            doc.selectFirst(".poster img")
+                ?.attr("src") ||
+            doc.selectFirst("img")
+                ?.attr("src");
 
         const description =
             doc.selectFirst("meta[name='description']")
-                ?.attr("content") ?? "";
+                ?.attr("content") ||
+            doc.selectFirst(".wp-content p")
+                ?.text?.trim() ||
+            "";
+
+        const episodes = [];
+
+        const epItems = doc.select(
+            "#seasons .episodios li, .episodes li, ul.episodios li"
+        );
+
+        if (epItems.length > 0) {
+
+            for (const ep of epItems) {
+
+                const a = ep.selectFirst("a");
+
+                if (!a) continue;
+
+                episodes.push({
+                    name:
+                        a.text.trim() ||
+                        "Episode",
+                    url: a.attr("href")
+                });
+            }
+
+        } else {
+
+            episodes.push({
+                name: "Episode 1",
+                url: url
+            });
+        }
 
         return {
             name: title,
@@ -118,109 +203,95 @@ class DefaultExtension extends MProvider {
         };
     }
 
-async getVideoList(url) {
+    async getVideoList(url) {
 
-    const client = new Client();
+        const client = new Client();
 
-    // STEP 1: Load episode page
-    const res = await client.get(url, {
-        headers: {
-            "User-Agent":
-                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
-        }
-    });
+        const res = await client.get(url, {
+            headers: {
+                "User-Agent":
+                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+            }
+        });
 
-    const html = res.body;
+        const html = res.body;
 
-    console.log("EPISODE HTML:");
-    console.log(html);
-
-    // STEP 2: Extract data-id directly
-    const dataMatch =
-        html.match(/data-id=["']([^"']+)["']/i);
-
-    if (!dataMatch) {
-
-        console.log("DATA-ID NOT FOUND");
-
-        return [];
-    }
-
-    let playerPath = dataMatch[1];
-
-    console.log("PLAYER PATH:", playerPath);
-
-    // STEP 3: Fix URL
-    let playerUrl = playerPath;
-
-    if (playerUrl.startsWith("/")) {
-        playerUrl = this.source.baseUrl + playerUrl;
-    }
-
-    console.log("PLAYER URL:", playerUrl);
-
-    // STEP 4: Extract vid parameter
-    const vidMatch =
-        playerUrl.match(/[?&]vid=([^&]+)/);
-
-    if (!vidMatch) {
-
-        console.log("VID PARAM NOT FOUND");
-
-        return [];
-    }
-
-    let decodedUrl = "";
-
-    try {
-
-        decodedUrl = atob(
-            decodeURIComponent(vidMatch[1])
+        // Try direct iframe first
+        let iframeMatch = html.match(
+            /<iframe[^>]+src=["']([^"']+)["']/i
         );
 
-    } catch (e) {
+        let playerUrl = "";
 
-        console.log("BASE64 ERROR:", e);
+        if (iframeMatch) {
 
-        return [];
-    }
+            playerUrl = iframeMatch[1];
 
-    console.log("DECODED URL:", decodedUrl);
+        } else {
 
-    if (
-        !decodedUrl.includes(".mp4") &&
-        !decodedUrl.includes(".m3u8")
-    ) {
+            // Fallback to data-id
+            const dataMatch =
+                html.match(/data-id=["']([^"']+)["']/i);
 
-        console.log("NOT A VIDEO URL");
-
-        return [];
-    }
-
-    // STEP 5: Return video
-    return [{
-        url: decodedUrl,
-
-        originalUrl: decodedUrl,
-
-        quality:
-            decodedUrl.includes(".m3u8")
-                ? "HLS"
-                : "MP4",
-
-        headers: {
-
-            "Referer": "https://nhplayer.com/",
-
-            "Origin": new URL(decodedUrl).origin,
-
-            "User-Agent":
-                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-
-            "Accept": "*/*"
+            if (dataMatch) {
+                playerUrl = dataMatch[1];
+            }
         }
-    }];
-}
+
+        if (!playerUrl) {
+            return [];
+        }
+
+        if (playerUrl.startsWith("/")) {
+            playerUrl =
+                this.source.baseUrl + playerUrl;
+        }
+
+        // Load player page
+        const playerRes = await client.get(playerUrl, {
+            headers: {
+                "Referer": url,
+                "User-Agent":
+                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+            }
+        });
+
+        const playerHtml = playerRes.body;
+
+        // Extract m3u8/mp4
+        const videoMatch =
+            playerHtml.match(/https?:\/\/[^"'\\ ]+\.(m3u8|mp4)[^"'\\ ]*/i);
+
+        if (!videoMatch) {
+            return [];
+        }
+
+        const videoUrl = videoMatch[0];
+
+        return [{
+            url: videoUrl,
+
+            originalUrl: videoUrl,
+
+            quality:
+                videoUrl.includes(".m3u8")
+                    ? "HLS"
+                    : "MP4",
+
+            headers: {
+
+                "Referer": playerUrl,
+
+                "Origin": new URL(videoUrl).origin,
+
+                "User-Agent":
+                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+
+                "Accept": "*/*"
+            }
+        }];
+    }
+
     async getPageList() {
         throw new Error("Not manga source");
     }
