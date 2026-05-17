@@ -88,7 +88,6 @@ class DefaultExtension extends MProvider {
         hasNextPage: true
     };
 }
-
     async getLatestUpdates(page) {
         return await this.getPopular(page);
     }
@@ -152,7 +151,6 @@ class DefaultExtension extends MProvider {
         hasNextPage: false
     };
 }
-
     async getDetail(url) {
 
     const doc = await this.request(url);
@@ -217,65 +215,129 @@ class DefaultExtension extends MProvider {
 
     async getVideoList(url) {
 
-        const res = await this.client.get(url, {
-            headers: {
-                "User-Agent":
-                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
-            }
-        });
+    const client = new Client();
 
-        const html = res.body;
-
-        // iframe source
-        let iframe =
-            html.match(/<iframe[^>]+src=["']([^"']+)["']/i);
-
-        if (!iframe) {
-            return [];
+    // STEP 1: Load episode page
+    const res = await client.get(url, {
+        headers: {
+            "User-Agent":
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+            "Referer": this.source.baseUrl
         }
+    });
 
-        let iframeUrl = iframe[1];
+    const html = res.body;
 
-        if (iframeUrl.startsWith("//")) {
-            iframeUrl = "https:" + iframeUrl;
+    // STEP 2: Find iframe
+    const iframeMatch =
+        html.match(/<iframe[^>]+src=["']([^"']+)["']/i);
+
+    if (!iframeMatch) {
+        return [];
+    }
+
+    let iframeUrl = iframeMatch[1];
+
+    // Fix URLs
+    if (iframeUrl.startsWith("//")) {
+        iframeUrl = "https:" + iframeUrl;
+    }
+
+    if (iframeUrl.startsWith("/")) {
+        iframeUrl = this.source.baseUrl + iframeUrl;
+    }
+
+    // STEP 3: Load JWPlayer page
+    const iframeRes = await client.get(iframeUrl, {
+        headers: {
+            "User-Agent":
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+            "Referer": url
         }
+    });
 
-        const player = await this.client.get(iframeUrl, {
-            headers: {
-                "Referer": url,
-                "User-Agent":
-                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
-            }
-        });
+    const iframeHtml = iframeRes.body;
 
-        const playerHtml = player.body;
+    // STEP 4: Extract all MP4/M3U8 URLs
+    const matches =
+        [...iframeHtml.matchAll(
+            /https?:\/\/[^"' ]+\.(mp4|m3u8)[^"' ]*/gi
+        )];
 
-        const video =
-            playerHtml.match(
-                /https?:\/\/[^"' ]+\.(m3u8|mp4)[^"' ]*/i
+    if (!matches.length) {
+        return [];
+    }
+
+    const seen = new Set();
+
+    const videos = [];
+
+    for (const match of matches) {
+
+        const videoUrl = match[0];
+
+        // Prevent duplicates
+        if (seen.has(videoUrl)) continue;
+
+        seen.add(videoUrl);
+
+        // Extract quality from filename
+        let quality = "Default";
+
+        const qualityMatch =
+            videoUrl.match(
+                /([0-9]{3,4}p)/i
             );
 
-        if (!video) {
-            return [];
+        if (qualityMatch) {
+            quality = qualityMatch[1];
+        } else if (
+            videoUrl.includes(".m3u8")
+        ) {
+            quality = "HLS";
         }
 
-        const videoUrl = video[0];
+        videos.push({
 
-        return [{
             url: videoUrl,
+
             originalUrl: videoUrl,
-            quality:
-                videoUrl.includes(".m3u8")
-                    ? "HLS"
-                    : "MP4",
+
+            quality: quality,
+
             headers: {
-                "Referer": iframeUrl,
-                "Origin": new URL(videoUrl).origin,
+
+                "Referer":
+                    "https://watchhentai.net/",
+
+                "Origin":
+                    videoUrl
+                        .split("/")
+                        .slice(0, 3)
+                        .join("/"),
+
                 "User-Agent":
-                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+
+                "Accept": "*/*"
             }
-        }];
+        });
     }
+
+    // Sort highest quality first
+    videos.sort((a, b) => {
+
+        const qa =
+            parseInt(a.quality) || 0;
+
+        const qb =
+            parseInt(b.quality) || 0;
+
+        return qb - qa;
+    });
+
+    return videos;
+}
 
     async getPageList() {
         throw new Error("Not manga source");
