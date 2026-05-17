@@ -307,20 +307,24 @@ class DefaultExtension extends MProvider {
 
             headers: {
 
-                "Referer":
-                    "https://watchhentai.net/",
+    "Referer":
+        "https://watchhentai.net/",
 
-                "Origin":
-                    videoUrl
-                        .split("/")
-                        .slice(0, 3)
-                        .join("/"),
+    "User-Agent":
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36",
 
-                "User-Agent":
-                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+    "Accept":
+        "*/*",
 
-                "Accept": "*/*"
-            }
+    "Accept-Encoding":
+        "identity;q=1, *;q=0",
+
+    "Range":
+        "bytes=0-",
+
+    "Connection":
+        "keep-alive"
+}
         });
     }
 
