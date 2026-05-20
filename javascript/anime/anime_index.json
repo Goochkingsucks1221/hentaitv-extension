@@ -30,7 +30,7 @@
     "dateFormat":"",
     "dateFormatLocale":"",
     "isNsfw":true,
-    "hasCloudflare":false,
+    "hasCloudflare":true,
     "sourceCodeUrl":"https://raw.githubusercontent.com/Goochkingsucks1221/watchhentai-extension/refs/heads/main/javascript/anime/src/all/hentaihaven.js",
     "apiUrl":"",
     "version":"0.0.1.0",
