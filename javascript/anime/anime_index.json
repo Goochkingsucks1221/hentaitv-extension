@@ -21,17 +21,17 @@
     "sourceCodeLanguage":1
   },
   {
-  "name": "Hen01",
-  "id": 987654323,
-  "baseUrl": "https://hen01.top",
+  "name": "HentaiTV",
+  "id": 987654322,
+  "baseUrl": "https://hentai.tv",
   "lang": "en-Sub",
   "typeSource": "single",
-  "iconUrl": "https://hen01.top/favicon.ico",
+  "iconUrl": "https://hentai.tv/favicon.ico",
   "dateFormat": "",
   "dateFormatLocale": "",
   "isNsfw": true,
   "hasCloudflare": false,
-  "sourceCodeUrl": "https://raw.githubusercontent.com/Goochkingsucks1221/watchhentai-extension/refs/heads/main/javascript/anime/src/all/hen01.js",
+  "sourceCodeUrl": "https://raw.githubusercontent.com/Goochkingsucks1221/watchhentai-extension/refs/heads/main/javascript/anime/src/all/hentaitv.js",
   "apiUrl": "",
   "version": "0.0.1.0",
   "isManga": false,
@@ -40,5 +40,5 @@
   "appMinVerReq": "0.2.0",
   "additionalParams": "",
   "sourceCodeLanguage": 1
-  }
+}
 ]
