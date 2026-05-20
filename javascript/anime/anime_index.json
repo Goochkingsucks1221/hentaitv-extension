@@ -19,5 +19,26 @@
     "appMinVerReq":"0.2.0",
     "additionalParams":"",
     "sourceCodeLanguage":1
+  },
+  {
+    "name":"HentaiHaven",
+    "id":987654322,
+    "baseUrl":"https://hentaihaven.xxx",
+    "lang":"en-Sub",
+    "typeSource":"single",
+    "iconUrl":"https://hentaihaven.xxx/favicon.ico",
+    "dateFormat":"",
+    "dateFormatLocale":"",
+    "isNsfw":true,
+    "hasCloudflare":false,
+    "sourceCodeUrl":"https://raw.githubusercontent.com/YOUR_USERNAME/YOUR_REPO/main/javascript/anime/src/all/hentaihaven.js",
+    "apiUrl":"",
+    "version":"0.0.1.0",
+    "isManga":false,
+    "itemType":1,
+    "isFullData":false,
+    "appMinVerReq":"0.2.0",
+    "additionalParams":"",
+    "sourceCodeLanguage":1
   }
 ]
